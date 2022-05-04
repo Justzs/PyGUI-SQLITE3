@@ -5,6 +5,7 @@ from tkinter import ttk
 from datetime import date
 from tkcalendar import Calendar #pip install tkcalendar
 from tkcalendar import DateEntry 
+import sendEmail as se
 
 def mainwindow() :
     global emptyMenubar
@@ -112,8 +113,7 @@ def employeesLayout(username):
     myEmpTree.column('col6', anchor=CENTER, width=130)
     myEmpTree.column('#0', width=0, minwidth=0)
 
-    my_display(0)
-    # fetchEmployees()
+    fetchEmployees()
     myEmpTree.bind('<Double-1>', treeviewClick)
     # #----------------------------------------------------------------#
     # |====================== Right Top Frame =========================|
@@ -312,20 +312,40 @@ def addEmployee():
         pass   
 def updateEmployee():
     if empRequiredField():
+        sql_before = "SELECT emp_salary FROM Employees WHERE emp_id = ?"
+        cursor.execute(sql_before, [emp_id])
+        salary_before = cursor.fetchone()
         sql = '''
             UPDATE Employees SET emp_fname=?, emp_lname=?, emp_born=?, emp_address=?, emp_phone=?, emp_salary=?, emp_department=?, emp_gender=?, emp_email=?
             WHERE emp_id = ?
         '''
         params = getEmpData()
         params.append(emp_id)
-        print(params)
         cursor.execute(sql, params)
         conn.commit()
+
+        sql_after = "SELECT emp_salary, emp_email, emp_fname, emp_fname FROM Employees WHERE emp_id =?"
+        cursor.execute(sql_after, [emp_id])
+        salary_after = cursor.fetchone()
+
         messagebox.showinfo("Admin", "Employee updated successfully.")
+
         fetchEmployees()
         clearData()
+
+        if salary_after[0] < salary_before[0]:
+            body = f'ถึง คุณ{salary_after[2]} {salary_after[3]}\n\t ยินดีด้วยคุณถูกเพิ่มเงินเดือน'
+            recipient = {salary_after[1]:'Employees'}
+            img =  "images/rich.jpg"
+            se.sendEmail(body, recipient, img)
+        elif salary_after[0] > salary_before[0]:
+            body = f'ถึง คุณ {salary_after[2]} {salary_after[3]}\n\t เสียใจด้วยเงินเดือนของคุณถูกลด'
+            recipient = {salary_after[1]:'Employees'}
+            img =  "images/angry.jpg"
+            se.sendEmail(body, recipient, img)
     else:
         pass
+    
 def deleteEmployee():
     msg = messagebox.askquestion('Delete!', 'Press yes to delete this employee.')
     if msg == 'yes':
@@ -467,56 +487,7 @@ def onChange(e):
     else:
         search_option['value'] = []
 
-def my_display(offset):    
-    limit = 5
-    cursor.execute("SELECT count(*) as no FROM Employees")
-    row = cursor.fetchone()
-    no_rec = row[0]
-    my_str = StringVar()
-    sql = '''
-        SELECT Employees.emp_id, Employees.emp_fname, Employees.emp_lname, Employees.emp_born, Employees.emp_address,
-        Employees.emp_phone, Employees.emp_salary, Employees.emp_gender, Employees.emp_email, Departments.de_name
-        FROM Employees INNER JOIN Departments ON Employees.emp_department = Departments.de_id
-        WHERE Employees.emp_status != "disable"
-        ORDER BY Employees.emp_id DESC LIMIT
-    ''' + str(offset) + ''',''' + str(limit)
 
-    cursor.execute(sql)
-    result = cursor.fetchall()
-
-    # q="SELECT * from student LIMIT "+ str(offset) +","+str(limit)
-    # r_set=my_conn.execute(q)
-    myEmpTree.delete(*myEmpTree.get_children())
-    for i, data in enumerate(result):
-            myEmpTree.insert('', 'end', values=(data[0], data[1], data[2], data[3], data[4], data[5]))
-
-    # Show buttons 
-    back = offset - limit # This value is used by Previous button
-    next = offset + limit # This value is used by Next button       
-    b1 = Button(leftFrame, text='< Prev', command=lambda: my_display(back))
-    b1.grid(row=1,column=0,sticky='news')
-    b2 = Button(leftFrame, text='Next >', command=lambda: my_display(next))
-    b2.grid(row=1,column=1,sticky='news')
-
-    if(no_rec <= next): 
-        b2["state"]="disabled" # disable next button
-    else:
-        b2["state"]="active"  # enable next button
-        
-    if(back >= 0):
-        b1["state"]="active"  # enable Prev button
-    else:
-        b1["state"]="disabled"# disable Prev button 
-    # for your understanding of how the offset value changes
-    # query is displayed here, it is not part of the script 
-    my_str.set("sql" + '\n' + "next: " + str(next) + "\n back:"+str(back))
-    l1 = Label(leftFrame, textvariable=my_str)
-    l1.grid(row=2,column=0)
-
-def dataPicker():
-    datePickerWindow = Toplevel(root)
-    datePickerWindow.geometry("150x150")
-    datePickerWindow.title("DatePicker")
 
 w = 1400 #width of application
 h = 750 #height of application
